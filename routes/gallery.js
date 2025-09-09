@@ -5,7 +5,7 @@ const path = require('path');
 const { v4: uuidv4 } = require('uuid');
 const { query, get, run } = require('../config/database');
 
-const galleryRouter = express.Router();
+const router = express.Router();
 
 // Configure multer for gallery uploads
 const galleryStorage = multer.diskStorage({
@@ -34,7 +34,7 @@ const galleryUpload = multer({
 });
 
 // GET /api/gallery - Get all gallery images
-galleryRouter.get('/', async (req, res) => {
+router.get('/', async (req, res) => {
   try {
     const { category, featured_only, page = 1, limit = 20 } = req.query;
     const offset = (page - 1) * limit;
@@ -73,7 +73,7 @@ galleryRouter.get('/', async (req, res) => {
 });
 
 // GET /api/gallery/:id - Get specific gallery image
-galleryRouter.get('/:id', async (req, res) => {
+router.get('/:id', async (req, res) => {
   try {
     const image = await get('SELECT * FROM gallery_images WHERE id = ?', [req.params.id]);
     
@@ -89,7 +89,7 @@ galleryRouter.get('/:id', async (req, res) => {
 });
 
 // POST /api/gallery - Upload new gallery image (admin only)
-galleryRouter.post('/', galleryUpload.single('image'), async (req, res) => {
+router.post('/', galleryUpload.single('image'), async (req, res) => {
   try {
     if (!req.file) {
       return res.status(400).json({ error: 'No image file provided' });
@@ -130,7 +130,7 @@ galleryRouter.post('/', galleryUpload.single('image'), async (req, res) => {
 });
 
 // PUT /api/gallery/:id - Update gallery image (admin only)
-galleryRouter.put('/:id', async (req, res) => {
+router.put('/:id', async (req, res) => {
   try {
     const imageId = req.params.id;
     const {
@@ -199,7 +199,7 @@ galleryRouter.put('/:id', async (req, res) => {
 });
 
 // DELETE /api/gallery/:id - Delete gallery image (admin only)
-galleryRouter.delete('/:id', async (req, res) => {
+router.delete('/:id', async (req, res) => {
   try {
     const imageId = req.params.id;
     
@@ -216,5 +216,4 @@ galleryRouter.delete('/:id', async (req, res) => {
   }
 });
 
-// Export both routers
-module.exports = { contactRouter: router, galleryRouter
+module.exports = router;
