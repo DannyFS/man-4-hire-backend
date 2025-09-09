@@ -59,8 +59,8 @@ uploadDirs.forEach(dir => {
 // Public routes (no authentication required)
 app.use('/api/auth', authRoutes);
 app.use('/api/services', serviceRoutes);
-app.use('/api/contact', contactRouter);
-app.use('/api/gallery', galleryRouter);
+app.use('/api/contact', contactRoutes);
+app.use('/api/gallery', galleryRoutes);
 
 // Public work order submission (no auth required for customers)
 app.use('/api/work-orders', (req, res, next) => {
