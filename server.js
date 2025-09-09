@@ -20,7 +20,8 @@ const { authenticateToken, requireAdmin } = require('./middleware/auth');
 // Import routes
 const workOrderRoutes = require('./routes/workOrders');
 const serviceRoutes = require('./routes/services');
-const { contactRouter, galleryRouter } = require('./routes/contact');
+const contactRoutes = require('./routes/contact');
+const galleryRoutes = require('./routes/gallery');
 const authRoutes = require('./routes/auth');
 
 // Middleware
