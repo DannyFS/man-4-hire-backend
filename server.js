@@ -49,6 +49,9 @@ app.use(limiter);
 // Static files
 app.use('/uploads', express.static(path.join(__dirname, 'uploads')));
 
+// Serve frontend build files
+app.use(express.static(path.join(__dirname, '../man-4-hire-client/build')));
+
 // Ensure upload directories exist
 const uploadDirs = ['uploads/gallery', 'uploads/work-orders'];
 uploadDirs.forEach(dir => {
@@ -188,20 +191,26 @@ app.use((error, req, res, next) => {
   });
 });
 
-// 404 handler
-app.use('*', (req, res) => {
-  res.status(404).json({ 
-    error: 'Route not found',
-    availableRoutes: [
-      '/api/health',
-      '/api/docs',
-      '/api/services',
-      '/api/work-orders',
-      '/api/contact',
-      '/api/gallery',
-      '/api/auth'
-    ]
-  });
+// Serve React app for all non-API routes
+app.get('*', (req, res) => {
+  // If it's an API route that doesn't exist, return 404 JSON
+  if (req.path.startsWith('/api')) {
+    return res.status(404).json({ 
+      error: 'API route not found',
+      availableRoutes: [
+        '/api/health',
+        '/api/docs',
+        '/api/services',
+        '/api/work-orders',
+        '/api/contact',
+        '/api/gallery',
+        '/api/auth'
+      ]
+    });
+  }
+  
+  // For all other routes, serve the React app
+  res.sendFile(path.join(__dirname, '../man-4-hire-client/build', 'index.html'));
 });
 
 // Graceful shutdown
@@ -219,8 +228,10 @@ process.on('SIGTERM', () => {
 
 // Start server
 app.listen(PORT, () => {
-  console.log(`🚀 Man for Hire API server running on port ${PORT}`);
+  console.log(`🚀 Man for Hire Full-Stack Application running on port ${PORT}`);
   console.log(`📝 Environment: ${process.env.NODE_ENV || 'development'}`);
+  console.log(`🌐 Frontend: http://localhost:${PORT}`);
+  console.log(`🔌 API: http://localhost:${PORT}/api`);
   console.log(`📚 API Documentation: http://localhost:${PORT}/api/docs`);
   console.log(`❤️  Health Check: http://localhost:${PORT}/api/health`);
   
