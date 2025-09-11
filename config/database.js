@@ -1,3 +1,4 @@
+// By Daniel and Shikhar
 // config/database.js
 const mongoose = require('mongoose');
 
