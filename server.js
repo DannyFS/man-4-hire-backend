@@ -1,3 +1,4 @@
+// By Daniel and Shikhar
 // server.js (Updated with auth routes and middleware)
 const express = require('express');
 const cors = require('cors');
