@@ -11,8 +11,8 @@ require('dotenv').config();
 const app = express();
 const PORT = process.env.PORT || 3000;
 
-// Import database connection
-const db = require('./config/database');
+// Import database connection and initialize MongoDB
+const { connectDB, getDashboardStats } = require('./config/database');
 
 // Import middleware
 const { authenticateToken, requireAdmin } = require('./middleware/auth');
@@ -79,39 +79,8 @@ app.use('/api/work-orders', (req, res, next) => {
 // Admin routes (require authentication and admin role)
 app.get('/api/admin/dashboard', authenticateToken, requireAdmin, async (req, res) => {
   try {
-    const { query } = require('./config/database');
-    
-    // Get dashboard statistics
-    const stats = await Promise.all([
-      query('SELECT COUNT(*) as count FROM work_orders WHERE status = "pending"'),
-      query('SELECT COUNT(*) as count FROM work_orders WHERE status = "in-progress"'),
-      query('SELECT COUNT(*) as count FROM work_orders WHERE status = "completed"'),
-      query('SELECT COUNT(*) as count FROM contact_messages WHERE status = "unread"'),
-      query('SELECT COUNT(*) as count FROM gallery_images'),
-      query('SELECT COUNT(*) as count FROM services WHERE is_active = 1'),
-      query(`SELECT service_type, COUNT(*) as count 
-             FROM work_orders 
-             WHERE created_at >= date('now', '-30 days') 
-             GROUP BY service_type 
-             ORDER BY count DESC 
-             LIMIT 5`),
-      query(`SELECT DATE(created_at) as date, COUNT(*) as count 
-             FROM work_orders 
-             WHERE created_at >= date('now', '-7 days') 
-             GROUP BY DATE(created_at) 
-             ORDER BY date`)
-    ]);
-
-    res.json({
-      pendingOrders: stats[0][0].count,
-      inProgressOrders: stats[1][0].count,
-      completedOrders: stats[2][0].count,
-      unreadMessages: stats[3][0].count,
-      galleryImages: stats[4][0].count,
-      activeServices: stats[5][0].count,
-      popularServices: stats[6],
-      weeklyActivity: stats[7]
-    });
+    const stats = await getDashboardStats();
+    res.json(stats);
   } catch (error) {
     console.error('Error fetching dashboard data:', error);
     res.status(500).json({ error: 'Failed to fetch dashboard data' });
@@ -216,24 +185,24 @@ app.get('*', (req, res) => {
 // Graceful shutdown
 process.on('SIGTERM', () => {
   console.log('SIGTERM received. Shutting down gracefully...');
-  db.close((err) => {
-    if (err) {
-      console.error('Error closing database:', err);
-    } else {
-      console.log('Database connection closed.');
-    }
+  const mongoose = require('mongoose');
+  mongoose.connection.close(() => {
+    console.log('MongoDB connection closed.');
     process.exit(0);
   });
 });
 
 // Start server
-app.listen(PORT, () => {
+app.listen(PORT, async () => {
   console.log(`🚀 Man for Hire Full-Stack Application running on port ${PORT}`);
   console.log(`📝 Environment: ${process.env.NODE_ENV || 'development'}`);
   console.log(`🌐 Frontend: http://localhost:${PORT}`);
   console.log(`🔌 API: http://localhost:${PORT}/api`);
   console.log(`📚 API Documentation: http://localhost:${PORT}/api/docs`);
   console.log(`❤️  Health Check: http://localhost:${PORT}/api/health`);
+  
+  // Connect to MongoDB
+  await connectDB();
   
   // Setup directories on startup
   const { setupDirectories } = require('./scripts/setup');

@@ -2,7 +2,8 @@
 const express = require('express');
 const bcrypt = require('bcryptjs');
 const jwt = require('jsonwebtoken');
-const { get, run } = require('../config/database');
+const { AdminUser } = require('../config/database');
+const mongoose = require('mongoose');
 const { authenticateToken } = require('../middleware/auth');
 
 const router = express.Router();
@@ -17,27 +18,26 @@ router.post('/login', async (req, res) => {
     }
 
     // Find user by username or email
-    const user = await get(
-      'SELECT * FROM admin_users WHERE username = ? OR email = ?',
-      [username, username]
-    );
+    const user = await AdminUser.findOne({
+      $or: [{ username }, { email: username }]
+    });
 
     if (!user) {
       return res.status(401).json({ error: 'Invalid credentials' });
     }
 
-    // Verify password
-    const isValidPassword = await bcrypt.compare(password, user.password_hash);
+    // Verify password using the model method
+    const isValidPassword = await user.comparePassword(password);
     if (!isValidPassword) {
       return res.status(401).json({ error: 'Invalid credentials' });
     }
 
     // Update last login
-    await run('UPDATE admin_users SET last_login = CURRENT_TIMESTAMP WHERE id = ?', [user.id]);
+    await AdminUser.findByIdAndUpdate(user._id, { lastLogin: new Date() });
 
     // Generate JWT token
     const token = jwt.sign(
-      { userId: user.id, username: user.username, role: user.role },
+      { userId: user._id, username: user.username, role: user.role },
       process.env.JWT_SECRET,
       { expiresIn: process.env.JWT_EXPIRES_IN || '24h' }
     );
@@ -46,11 +46,11 @@ router.post('/login', async (req, res) => {
       message: 'Login successful',
       token,
       user: {
-        id: user.id,
+        id: user._id,
         username: user.username,
         email: user.email,
         role: user.role,
-        lastLogin: user.last_login
+        lastLogin: user.lastLogin
       }
     });
   } catch (error) {
@@ -71,8 +71,8 @@ router.post('/register', async (req, res) => {
     }
 
     // Check if any admin users exist (only allow registration if no admins exist)
-    const existingAdmins = await get('SELECT COUNT(*) as count FROM admin_users');
-    if (existingAdmins.count > 0) {
+    const adminCount = await AdminUser.countDocuments();
+    if (adminCount > 0) {
       return res.status(403).json({
         error: 'Admin registration disabled. Contact existing admin.'
       });
@@ -91,22 +91,20 @@ router.post('/register', async (req, res) => {
       });
     }
 
-    // Hash password
-    const saltRounds = 12;
-    const passwordHash = await bcrypt.hash(password, saltRounds);
-
-    // Create admin user
-    const result = await run(`
-      INSERT INTO admin_users (username, email, password_hash, role)
-      VALUES (?, ?, ?, 'admin')
-    `, [username, email, passwordHash]);
+    // Create admin user (password will be hashed by the pre-save hook)
+    const newAdmin = await AdminUser.create({
+      username,
+      email,
+      passwordHash: password, // Will be hashed by the pre-save hook
+      role: 'admin'
+    });
 
     res.status(201).json({
       message: 'Admin user created successfully',
-      userId: result.id
+      userId: newAdmin._id
     });
   } catch (error) {
-    if (error.code === 'SQLITE_CONSTRAINT_UNIQUE') {
+    if (error.code === 11000) {
       return res.status(409).json({
         error: 'Username or email already exists'
       });
@@ -124,7 +122,7 @@ router.get('/me', authenticateToken, async (req, res) => {
       username: req.user.username,
       email: req.user.email,
       role: req.user.role,
-      lastLogin: req.user.last_login
+      lastLogin: req.user.lastLogin
     }
   });
 });
@@ -141,7 +139,7 @@ router.post('/change-password', authenticateToken, async (req, res) => {
     }
 
     // Verify current password
-    const isValidPassword = await bcrypt.compare(currentPassword, req.user.password_hash);
+    const isValidPassword = await req.user.comparePassword(currentPassword);
     if (!isValidPassword) {
       return res.status(401).json({ error: 'Current password is incorrect' });
     }
@@ -153,14 +151,10 @@ router.post('/change-password', authenticateToken, async (req, res) => {
       });
     }
 
-    // Hash new password
-    const saltRounds = 12;
-    const newPasswordHash = await bcrypt.hash(newPassword, saltRounds);
-
-    // Update password
-    await run(
-      'UPDATE admin_users SET password_hash = ? WHERE id = ?',
-      [newPasswordHash, req.user.id]
+    // Update password (will be hashed by the pre-save hook)
+    await AdminUser.findByIdAndUpdate(
+      req.user._id,
+      { passwordHash: newPassword }
     );
 
     res.json({ message: 'Password changed successfully' });

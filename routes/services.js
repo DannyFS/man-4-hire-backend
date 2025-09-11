@@ -1,6 +1,6 @@
 // routes/services.js
 const express = require('express');
-const { query, get, run } = require('../config/database');
+const { Service } = require('../config/database');
 
 const router = express.Router();
 
@@ -9,26 +9,17 @@ router.get('/', async (req, res) => {
   try {
     const { category, active_only = 'true' } = req.query;
     
-    let sql = 'SELECT * FROM services';
-    let params = [];
-    let conditions = [];
+    let filter = {};
     
     if (active_only === 'true') {
-      conditions.push('is_active = 1');
+      filter.isActive = true;
     }
     
     if (category) {
-      conditions.push('category = ?');
-      params.push(category);
+      filter.category = category;
     }
     
-    if (conditions.length > 0) {
-      sql += ' WHERE ' + conditions.join(' AND ');
-    }
-    
-    sql += ' ORDER BY category, name';
-    
-    const services = await query(sql, params);
+    const services = await Service.find(filter).sort({ category: 1, name: 1 });
     
     res.json(services);
   } catch (error) {
@@ -40,17 +31,27 @@ router.get('/', async (req, res) => {
 // GET /api/services/categories - Get all service categories
 router.get('/categories', async (req, res) => {
   try {
-    const categories = await query(`
-      SELECT 
-        category,
-        COUNT(*) as service_count,
-        MIN(base_price) as min_price,
-        MAX(base_price) as max_price
-      FROM services 
-      WHERE is_active = 1 
-      GROUP BY category 
-      ORDER BY category
-    `);
+    const categories = await Service.aggregate([
+      { $match: { isActive: true } },
+      {
+        $group: {
+          _id: '$category',
+          service_count: { $sum: 1 },
+          min_price: { $min: '$basePrice' },
+          max_price: { $max: '$basePrice' }
+        }
+      },
+      {
+        $project: {
+          category: '$_id',
+          service_count: 1,
+          min_price: 1,
+          max_price: 1,
+          _id: 0
+        }
+      },
+      { $sort: { category: 1 } }
+    ]);
     
     res.json(categories);
   } catch (error) {
@@ -62,7 +63,7 @@ router.get('/categories', async (req, res) => {
 // GET /api/services/:id - Get specific service
 router.get('/:id', async (req, res) => {
   try {
-    const service = await get('SELECT * FROM services WHERE id = ?', [req.params.id]);
+    const service = await Service.findById(req.params.id);
     
     if (!service) {
       return res.status(404).json({ error: 'Service not found' });
@@ -82,39 +83,34 @@ router.post('/', async (req, res) => {
       name,
       description,
       category,
-      base_price,
+      basePrice,
       unit = 'per hour',
-      is_active = true,
-      image_url
+      isActive = true,
+      imageUrl
     } = req.body;
 
     // Validation
-    if (!name || !category || !base_price) {
+    if (!name || !category || !basePrice) {
       return res.status(400).json({
-        error: 'Missing required fields: name, category, base_price'
+        error: 'Missing required fields: name, category, basePrice'
       });
     }
 
-    if (isNaN(parseFloat(base_price)) || parseFloat(base_price) < 0) {
+    if (isNaN(parseFloat(basePrice)) || parseFloat(basePrice) < 0) {
       return res.status(400).json({
-        error: 'base_price must be a positive number'
+        error: 'basePrice must be a positive number'
       });
     }
 
-    const result = await run(`
-      INSERT INTO services (name, description, category, base_price, unit, is_active, image_url)
-      VALUES (?, ?, ?, ?, ?, ?, ?)
-    `, [
+    const newService = await Service.create({
       name,
-      description || null,
+      description,
       category,
-      parseFloat(base_price),
+      basePrice: parseFloat(basePrice),
       unit,
-      is_active ? 1 : 0,
-      image_url || null
-    ]);
-
-    const newService = await get('SELECT * FROM services WHERE id = ?', [result.id]);
+      isActive,
+      imageUrl
+    });
 
     res.status(201).json({
       message: 'Service created successfully',
@@ -134,74 +130,43 @@ router.put('/:id', async (req, res) => {
       name,
       description,
       category,
-      base_price,
+      basePrice,
       unit,
-      is_active,
-      image_url
+      isActive,
+      imageUrl
     } = req.body;
 
-    // Verify service exists
-    const existingService = await get('SELECT id FROM services WHERE id = ?', [serviceId]);
-    if (!existingService) {
-      return res.status(404).json({ error: 'Service not found' });
-    }
+    let updateData = {};
 
-    let updateFields = [];
-    let updateValues = [];
+    if (name) updateData.name = name;
+    if (description !== undefined) updateData.description = description;
+    if (category) updateData.category = category;
+    if (unit) updateData.unit = unit;
+    if (isActive !== undefined) updateData.isActive = isActive;
+    if (imageUrl !== undefined) updateData.imageUrl = imageUrl;
 
-    if (name) {
-      updateFields.push('name = ?');
-      updateValues.push(name);
-    }
-
-    if (description !== undefined) {
-      updateFields.push('description = ?');
-      updateValues.push(description);
-    }
-
-    if (category) {
-      updateFields.push('category = ?');
-      updateValues.push(category);
-    }
-
-    if (base_price !== undefined) {
-      if (isNaN(parseFloat(base_price)) || parseFloat(base_price) < 0) {
+    if (basePrice !== undefined) {
+      if (isNaN(parseFloat(basePrice)) || parseFloat(basePrice) < 0) {
         return res.status(400).json({
-          error: 'base_price must be a positive number'
+          error: 'basePrice must be a positive number'
         });
       }
-      updateFields.push('base_price = ?');
-      updateValues.push(parseFloat(base_price));
+      updateData.basePrice = parseFloat(basePrice);
     }
 
-    if (unit) {
-      updateFields.push('unit = ?');
-      updateValues.push(unit);
-    }
-
-    if (is_active !== undefined) {
-      updateFields.push('is_active = ?');
-      updateValues.push(is_active ? 1 : 0);
-    }
-
-    if (image_url !== undefined) {
-      updateFields.push('image_url = ?');
-      updateValues.push(image_url);
-    }
-
-    if (updateFields.length === 0) {
+    if (Object.keys(updateData).length === 0) {
       return res.status(400).json({ error: 'No valid fields to update' });
     }
 
-    updateFields.push('updated_at = CURRENT_TIMESTAMP');
-    updateValues.push(serviceId);
-
-    await run(
-      `UPDATE services SET ${updateFields.join(', ')} WHERE id = ?`,
-      updateValues
+    const updatedService = await Service.findByIdAndUpdate(
+      serviceId,
+      updateData,
+      { new: true, runValidators: true }
     );
 
-    const updatedService = await get('SELECT * FROM services WHERE id = ?', [serviceId]);
+    if (!updatedService) {
+      return res.status(404).json({ error: 'Service not found' });
+    }
 
     res.json({
       message: 'Service updated successfully',
@@ -218,9 +183,9 @@ router.delete('/:id', async (req, res) => {
   try {
     const serviceId = req.params.id;
     
-    const result = await run('DELETE FROM services WHERE id = ?', [serviceId]);
+    const deletedService = await Service.findByIdAndDelete(serviceId);
     
-    if (result.changes === 0) {
+    if (!deletedService) {
       return res.status(404).json({ error: 'Service not found' });
     }
     

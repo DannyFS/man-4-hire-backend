@@ -3,7 +3,8 @@ const express = require('express');
 const multer = require('multer');
 const path = require('path');
 const { v4: uuidv4 } = require('uuid');
-const { query, get, run } = require('../config/database');
+const { GalleryImage } = require('../config/database');
+const mongoose = require('mongoose');
 
 const router = express.Router();
 
@@ -37,29 +38,23 @@ const galleryUpload = multer({
 router.get('/', async (req, res) => {
   try {
     const { category, featured_only, page = 1, limit = 20 } = req.query;
-    const offset = (page - 1) * limit;
+    const skip = (page - 1) * limit;
     
-    let sql = 'SELECT * FROM gallery_images';
-    let params = [];
-    let conditions = [];
+    let filter = {};
     
     if (category) {
-      conditions.push('category = ?');
-      params.push(category);
+      filter.category = category;
     }
     
     if (featured_only === 'true') {
-      conditions.push('is_featured = 1');
+      filter.isFeatured = true;
     }
     
-    if (conditions.length > 0) {
-      sql += ' WHERE ' + conditions.join(' AND ');
-    }
-    
-    sql += ' ORDER BY is_featured DESC, created_at DESC LIMIT ? OFFSET ?';
-    params.push(parseInt(limit), parseInt(offset));
-    
-    const images = await query(sql, params);
+    const images = await GalleryImage.find(filter)
+      .sort({ isFeatured: -1, createdAt: -1 })
+      .limit(parseInt(limit))
+      .skip(skip)
+      .lean();
     
     res.json({
       images,
@@ -75,7 +70,11 @@ router.get('/', async (req, res) => {
 // GET /api/gallery/:id - Get specific gallery image
 router.get('/:id', async (req, res) => {
   try {
-    const image = await get('SELECT * FROM gallery_images WHERE id = ?', [req.params.id]);
+    if (!mongoose.Types.ObjectId.isValid(req.params.id)) {
+      return res.status(400).json({ error: 'Invalid gallery image ID' });
+    }
+
+    const image = await GalleryImage.findById(req.params.id).lean();
     
     if (!image) {
       return res.status(404).json({ error: 'Gallery image not found' });
@@ -99,25 +98,20 @@ router.post('/', galleryUpload.single('image'), async (req, res) => {
       title,
       description,
       category,
-      project_date,
-      is_featured = false
+      projectDate,
+      isFeatured = false
     } = req.body;
 
     const imageUrl = `/uploads/gallery/${req.file.filename}`;
 
-    const result = await run(`
-      INSERT INTO gallery_images (title, description, image_url, category, project_date, is_featured)
-      VALUES (?, ?, ?, ?, ?, ?)
-    `, [
-      title || null,
-      description || null,
+    const newImage = await GalleryImage.create({
+      title: title || null,
+      description: description || null,
       imageUrl,
-      category || null,
-      project_date || null,
-      is_featured ? 1 : 0
-    ]);
-
-    const newImage = await get('SELECT * FROM gallery_images WHERE id = ?', [result.id]);
+      category: category || null,
+      projectDate: projectDate || null,
+      isFeatured: isFeatured === 'true' || isFeatured === true
+    });
 
     res.status(201).json({
       message: 'Gallery image uploaded successfully',
@@ -137,56 +131,49 @@ router.put('/:id', async (req, res) => {
       title,
       description,
       category,
-      project_date,
-      is_featured
+      projectDate,
+      isFeatured
     } = req.body;
 
-    // Verify image exists
-    const existingImage = await get('SELECT id FROM gallery_images WHERE id = ?', [imageId]);
-    if (!existingImage) {
-      return res.status(404).json({ error: 'Gallery image not found' });
+    if (!mongoose.Types.ObjectId.isValid(imageId)) {
+      return res.status(400).json({ error: 'Invalid gallery image ID' });
     }
 
-    let updateFields = [];
-    let updateValues = [];
+    let updateData = {};
 
     if (title !== undefined) {
-      updateFields.push('title = ?');
-      updateValues.push(title);
+      updateData.title = title;
     }
 
     if (description !== undefined) {
-      updateFields.push('description = ?');
-      updateValues.push(description);
+      updateData.description = description;
     }
 
     if (category !== undefined) {
-      updateFields.push('category = ?');
-      updateValues.push(category);
+      updateData.category = category;
     }
 
-    if (project_date !== undefined) {
-      updateFields.push('project_date = ?');
-      updateValues.push(project_date);
+    if (projectDate !== undefined) {
+      updateData.projectDate = projectDate;
     }
 
-    if (is_featured !== undefined) {
-      updateFields.push('is_featured = ?');
-      updateValues.push(is_featured ? 1 : 0);
+    if (isFeatured !== undefined) {
+      updateData.isFeatured = isFeatured === 'true' || isFeatured === true;
     }
 
-    if (updateFields.length === 0) {
+    if (Object.keys(updateData).length === 0) {
       return res.status(400).json({ error: 'No valid fields to update' });
     }
 
-    updateValues.push(imageId);
+    const updatedImage = await GalleryImage.findByIdAndUpdate(
+      imageId,
+      updateData,
+      { new: true, runValidators: true }
+    ).lean();
 
-    await run(
-      `UPDATE gallery_images SET ${updateFields.join(', ')} WHERE id = ?`,
-      updateValues
-    );
-
-    const updatedImage = await get('SELECT * FROM gallery_images WHERE id = ?', [imageId]);
+    if (!updatedImage) {
+      return res.status(404).json({ error: 'Gallery image not found' });
+    }
 
     res.json({
       message: 'Gallery image updated successfully',
@@ -203,9 +190,13 @@ router.delete('/:id', async (req, res) => {
   try {
     const imageId = req.params.id;
     
-    const result = await run('DELETE FROM gallery_images WHERE id = ?', [imageId]);
+    if (!mongoose.Types.ObjectId.isValid(imageId)) {
+      return res.status(400).json({ error: 'Invalid gallery image ID' });
+    }
     
-    if (result.changes === 0) {
+    const deletedImage = await GalleryImage.findByIdAndDelete(imageId);
+    
+    if (!deletedImage) {
       return res.status(404).json({ error: 'Gallery image not found' });
     }
     

@@ -1,7 +1,7 @@
 // middleware/auth.js
 const jwt = require('jsonwebtoken');
-const bcrypt = require('bcryptjs');
-const { get } = require('../config/database');
+const { AdminUser } = require('../config/database');
+const mongoose = require('mongoose');
 
 // Middleware to verify JWT token
 const authenticateToken = async (req, res, next) => {
@@ -14,7 +14,12 @@ const authenticateToken = async (req, res, next) => {
 
   try {
     const decoded = jwt.verify(token, process.env.JWT_SECRET);
-    const user = await get('SELECT * FROM admin_users WHERE id = ?', [decoded.userId]);
+    
+    if (!mongoose.Types.ObjectId.isValid(decoded.userId)) {
+      return res.status(403).json({ error: 'Invalid token' });
+    }
+    
+    const user = await AdminUser.findById(decoded.userId).lean();
     
     if (!user) {
       return res.status(403).json({ error: 'Invalid token' });

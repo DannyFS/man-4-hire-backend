@@ -1,6 +1,7 @@
 // routes/contact.js
 const express = require('express');
-const { query, get, run } = require('../config/database');
+const { ContactMessage } = require('../config/database');
+const mongoose = require('mongoose');
 
 const router = express.Router();
 
@@ -22,14 +23,16 @@ router.post('/', async (req, res) => {
       return res.status(400).json({ error: 'Invalid email format' });
     }
 
-    const result = await run(`
-      INSERT INTO contact_messages (name, email, subject, message)
-      VALUES (?, ?, ?, ?)
-    `, [name, email, subject || null, message]);
+    const contactMessage = await ContactMessage.create({
+      name,
+      email,
+      subject: subject || null,
+      message
+    });
 
     res.status(201).json({
       message: 'Contact message submitted successfully',
-      id: result.id
+      id: contactMessage._id
     });
   } catch (error) {
     console.error('Error submitting contact message:', error);
@@ -41,20 +44,19 @@ router.post('/', async (req, res) => {
 router.get('/', async (req, res) => {
   try {
     const { status, page = 1, limit = 20 } = req.query;
-    const offset = (page - 1) * limit;
+    const skip = (page - 1) * limit;
     
-    let sql = 'SELECT * FROM contact_messages';
-    let params = [];
+    let filter = {};
     
     if (status) {
-      sql += ' WHERE status = ?';
-      params.push(status);
+      filter.status = status;
     }
     
-    sql += ' ORDER BY created_at DESC LIMIT ? OFFSET ?';
-    params.push(parseInt(limit), parseInt(offset));
-    
-    const messages = await query(sql, params);
+    const messages = await ContactMessage.find(filter)
+      .sort({ createdAt: -1 })
+      .limit(parseInt(limit))
+      .skip(skip)
+      .lean();
     
     res.json({
       messages,
@@ -73,17 +75,22 @@ router.put('/:id', async (req, res) => {
     const { status } = req.body;
     const messageId = req.params.id;
 
-    const validStatuses = ['unread', 'read', 'responded'];
+    if (!mongoose.Types.ObjectId.isValid(messageId)) {
+      return res.status(400).json({ error: 'Invalid message ID' });
+    }
+
+    const validStatuses = ['unread', 'read', 'replied'];
     if (!validStatuses.includes(status)) {
       return res.status(400).json({ error: 'Invalid status value' });
     }
 
-    const result = await run(
-      'UPDATE contact_messages SET status = ? WHERE id = ?',
-      [status, messageId]
+    const updatedMessage = await ContactMessage.findByIdAndUpdate(
+      messageId,
+      { status },
+      { new: true, runValidators: true }
     );
 
-    if (result.changes === 0) {
+    if (!updatedMessage) {
       return res.status(404).json({ error: 'Contact message not found' });
     }
 

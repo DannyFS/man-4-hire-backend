@@ -3,7 +3,8 @@ const express = require('express');
 const multer = require('multer');
 const path = require('path');
 const { v4: uuidv4 } = require('uuid');
-const { query, get, run } = require('../config/database');
+const { WorkOrder } = require('../config/database');
+const mongoose = require('mongoose');
 
 const router = express.Router();
 
@@ -38,29 +39,22 @@ const upload = multer({
 router.get('/', async (req, res) => {
   try {
     const { status, page = 1, limit = 20 } = req.query;
-    const offset = (page - 1) * limit;
+    const skip = (page - 1) * limit;
     
-    let sql = 'SELECT * FROM work_orders';
-    let params = [];
+    let filter = {};
     
     if (status) {
-      sql += ' WHERE status = ?';
-      params.push(status);
+      filter.status = status;
     }
     
-    sql += ' ORDER BY created_at DESC LIMIT ? OFFSET ?';
-    params.push(parseInt(limit), parseInt(offset));
-    
-    const workOrders = await query(sql, params);
-    
-    // Parse images JSON for each work order
-    const formattedOrders = workOrders.map(order => ({
-      ...order,
-      images: order.images ? JSON.parse(order.images) : []
-    }));
+    const workOrders = await WorkOrder.find(filter)
+      .sort({ createdAt: -1 })
+      .limit(parseInt(limit))
+      .skip(skip)
+      .lean();
     
     res.json({
-      workOrders: formattedOrders,
+      workOrders,
       page: parseInt(page),
       limit: parseInt(limit)
     });
@@ -73,14 +67,15 @@ router.get('/', async (req, res) => {
 // GET /api/work-orders/:id - Get specific work order
 router.get('/:id', async (req, res) => {
   try {
-    const workOrder = await get('SELECT * FROM work_orders WHERE id = ?', [req.params.id]);
+    if (!mongoose.Types.ObjectId.isValid(req.params.id)) {
+      return res.status(400).json({ error: 'Invalid work order ID' });
+    }
+
+    const workOrder = await WorkOrder.findById(req.params.id).lean();
     
     if (!workOrder) {
       return res.status(404).json({ error: 'Work order not found' });
     }
-    
-    // Parse images JSON
-    workOrder.images = workOrder.images ? JSON.parse(workOrder.images) : [];
     
     res.json(workOrder);
   } catch (error) {
@@ -122,29 +117,21 @@ router.post('/', upload.array('images', 5), async (req, res) => {
     // Process uploaded images
     const imagePaths = req.files ? req.files.map(file => `/uploads/work-orders/${file.filename}`) : [];
 
-    const result = await run(`
-      INSERT INTO work_orders (
-        customer_name, customer_email, customer_phone, customer_address,
-        service_type, description, priority, preferred_date, preferred_time,
-        budget_range, notes, images, status
-      ) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, 'pending')
-    `, [
+    const newWorkOrder = await WorkOrder.create({
       customerName,
       customerEmail,
-      customerPhone || null,
-      customerAddress || null,
+      customerPhone: customerPhone || null,
+      customerAddress: customerAddress || null,
       serviceType,
       description,
       priority,
-      preferredDate || null,
-      preferredTime || null,
-      budgetRange || null,
-      notes || null,
-      JSON.stringify(imagePaths)
-    ]);
-
-    const newWorkOrder = await get('SELECT * FROM work_orders WHERE id = ?', [result.id]);
-    newWorkOrder.images = JSON.parse(newWorkOrder.images || '[]');
+      preferredDate: preferredDate || null,
+      preferredTime: preferredTime || null,
+      budgetRange: budgetRange || null,
+      notes: notes || null,
+      images: imagePaths,
+      status: 'pending'
+    });
 
     res.status(201).json({
       message: 'Work order submitted successfully',
@@ -162,45 +149,39 @@ router.put('/:id', async (req, res) => {
     const { status, notes } = req.body;
     const workOrderId = req.params.id;
 
-    // Verify work order exists
-    const existingOrder = await get('SELECT id FROM work_orders WHERE id = ?', [workOrderId]);
-    if (!existingOrder) {
-      return res.status(404).json({ error: 'Work order not found' });
+    if (!mongoose.Types.ObjectId.isValid(workOrderId)) {
+      return res.status(400).json({ error: 'Invalid work order ID' });
     }
 
     // Valid status values
-    const validStatuses = ['pending', 'in-progress', 'completed', 'cancelled', 'on-hold'];
+    const validStatuses = ['pending', 'in-progress', 'completed', 'cancelled'];
     if (status && !validStatuses.includes(status)) {
       return res.status(400).json({ error: 'Invalid status value' });
     }
 
-    let updateFields = [];
-    let updateValues = [];
+    let updateData = {};
 
     if (status) {
-      updateFields.push('status = ?');
-      updateValues.push(status);
+      updateData.status = status;
     }
 
-    if (notes) {
-      updateFields.push('notes = ?');
-      updateValues.push(notes);
+    if (notes !== undefined) {
+      updateData.notes = notes;
     }
 
-    if (updateFields.length === 0) {
+    if (Object.keys(updateData).length === 0) {
       return res.status(400).json({ error: 'No valid fields to update' });
     }
 
-    updateFields.push('updated_at = CURRENT_TIMESTAMP');
-    updateValues.push(workOrderId);
+    const updatedOrder = await WorkOrder.findByIdAndUpdate(
+      workOrderId,
+      updateData,
+      { new: true, runValidators: true }
+    ).lean();
 
-    await run(
-      `UPDATE work_orders SET ${updateFields.join(', ')} WHERE id = ?`,
-      updateValues
-    );
-
-    const updatedOrder = await get('SELECT * FROM work_orders WHERE id = ?', [workOrderId]);
-    updatedOrder.images = JSON.parse(updatedOrder.images || '[]');
+    if (!updatedOrder) {
+      return res.status(404).json({ error: 'Work order not found' });
+    }
 
     res.json({
       message: 'Work order updated successfully',
@@ -217,9 +198,13 @@ router.delete('/:id', async (req, res) => {
   try {
     const workOrderId = req.params.id;
     
-    const result = await run('DELETE FROM work_orders WHERE id = ?', [workOrderId]);
+    if (!mongoose.Types.ObjectId.isValid(workOrderId)) {
+      return res.status(400).json({ error: 'Invalid work order ID' });
+    }
     
-    if (result.changes === 0) {
+    const deletedOrder = await WorkOrder.findByIdAndDelete(workOrderId);
+    
+    if (!deletedOrder) {
       return res.status(404).json({ error: 'Work order not found' });
     }
     
