@@ -2,6 +2,11 @@
 const mongoose = require('mongoose');
 
 const workOrderSchema = new mongoose.Schema({
+  userId: {
+    type: mongoose.Schema.Types.ObjectId,
+    ref: 'User',
+    default: null
+  },
   customerName: {
     type: String,
     required: true,
@@ -71,5 +76,6 @@ workOrderSchema.index({ status: 1, createdAt: -1 });
 workOrderSchema.index({ customerEmail: 1 });
 workOrderSchema.index({ serviceType: 1 });
 workOrderSchema.index({ createdAt: -1 });
+workOrderSchema.index({ userId: 1, createdAt: -1 });
 
 module.exports = mongoose.model('WorkOrder', workOrderSchema);

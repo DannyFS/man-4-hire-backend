@@ -2,8 +2,10 @@
 const express = require('express');
 const multer = require('multer');
 const path = require('path');
+const jwt = require('jsonwebtoken');
 const { v4: uuidv4 } = require('uuid');
 const { WorkOrder } = require('../config/database');
+const User = require('../models/User');
 const mongoose = require('mongoose');
 
 const router = express.Router();
@@ -64,6 +66,54 @@ router.get('/', async (req, res) => {
   }
 });
 
+// GET /api/work-orders/my-orders - Get current user's work orders
+router.get('/my-orders', async (req, res) => {
+  try {
+    const token = req.headers.authorization?.replace('Bearer ', '');
+    
+    if (!token) {
+      return res.status(401).json({ error: 'Authentication required' });
+    }
+
+    const decoded = jwt.verify(token, process.env.JWT_SECRET);
+    
+    if (decoded.role !== 'user') {
+      return res.status(403).json({ error: 'Access denied. User account required.' });
+    }
+
+    const { status, page = 1, limit = 20 } = req.query;
+    const skip = (page - 1) * limit;
+    
+    let filter = { userId: decoded.userId };
+    
+    if (status) {
+      filter.status = status;
+    }
+    
+    const workOrders = await WorkOrder.find(filter)
+      .sort({ createdAt: -1 })
+      .limit(parseInt(limit))
+      .skip(skip)
+      .lean();
+    
+    const totalCount = await WorkOrder.countDocuments(filter);
+    
+    res.json({
+      workOrders,
+      page: parseInt(page),
+      limit: parseInt(limit),
+      totalCount,
+      totalPages: Math.ceil(totalCount / limit)
+    });
+  } catch (error) {
+    console.error('Error fetching user work orders:', error);
+    if (error.name === 'JsonWebTokenError') {
+      return res.status(401).json({ error: 'Invalid token' });
+    }
+    res.status(500).json({ error: 'Failed to fetch work orders' });
+  }
+});
+
 // GET /api/work-orders/:id - Get specific work order
 router.get('/:id', async (req, res) => {
   try {
@@ -114,10 +164,25 @@ router.post('/', upload.array('images', 5), async (req, res) => {
       return res.status(400).json({ error: 'Invalid email format' });
     }
 
+    // Check for user authentication (optional)
+    let userId = null;
+    const token = req.headers.authorization?.replace('Bearer ', '');
+    if (token) {
+      try {
+        const decoded = jwt.verify(token, process.env.JWT_SECRET);
+        if (decoded.role === 'user') {
+          userId = decoded.userId;
+        }
+      } catch (error) {
+        // Token invalid or expired, continue as guest
+      }
+    }
+
     // Process uploaded images
     const imagePaths = req.files ? req.files.map(file => `/uploads/work-orders/${file.filename}`) : [];
 
     const newWorkOrder = await WorkOrder.create({
+      userId,
       customerName,
       customerEmail,
       customerPhone: customerPhone || null,

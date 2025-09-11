@@ -24,6 +24,7 @@ const serviceRoutes = require('./routes/services');
 const contactRoutes = require('./routes/contact');
 const galleryRoutes = require('./routes/gallery');
 const authRoutes = require('./routes/auth');
+const userAuthRoutes = require('./routes/userAuth');
 
 // Middleware
 app.use(helmet());
@@ -79,6 +80,7 @@ uploadDirs.forEach(dir => {
 
 // Public routes (no authentication required)
 app.use('/api/auth', authRoutes);
+app.use('/api/user-auth', userAuthRoutes);
 app.use('/api/services', serviceRoutes);
 app.use('/api/contact', contactRoutes);
 app.use('/api/gallery', galleryRoutes);
@@ -87,6 +89,10 @@ app.use('/api/gallery', galleryRoutes);
 app.use('/api/work-orders', (req, res, next) => {
   // Allow POST requests without authentication (for customers to submit orders)
   if (req.method === 'POST') {
+    return next();
+  }
+  // Allow GET requests to /my-orders for authenticated users
+  if (req.method === 'GET' && req.path === '/my-orders') {
     return next();
   }
   // Require authentication for all other work order operations

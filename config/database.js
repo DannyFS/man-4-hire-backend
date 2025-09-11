@@ -26,6 +26,7 @@ const WorkOrder = require('../models/WorkOrder');
 const ContactMessage = require('../models/ContactMessage');
 const GalleryImage = require('../models/GalleryImage');
 const AdminUser = require('../models/AdminUser');
+const User = require('../models/User');
 
 // Seed default services and admin user
 const seedDefaultData = async () => {
@@ -267,5 +268,6 @@ module.exports = {
   WorkOrder,
   ContactMessage,
   GalleryImage,
-  AdminUser
+  AdminUser,
+  User
 };
