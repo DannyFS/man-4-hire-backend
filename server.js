@@ -80,7 +80,21 @@ uploadDirs.forEach(dir => {
 
 // Public routes (no authentication required)
 app.use('/api/auth', authRoutes);
-app.use('/api/user-auth', userAuthRoutes);
+
+// User authentication routes with explicit CORS handling
+app.use('/api/user-auth', (req, res, next) => {
+  // Set CORS headers for user-auth routes specifically
+  const origin = req.headers.origin;
+  if (origin && (origin.endsWith('.vercel.app') || 
+      (process.env.ALLOWED_ORIGINS && process.env.ALLOWED_ORIGINS.split(',').includes(origin)))) {
+    res.header('Access-Control-Allow-Origin', origin);
+    res.header('Access-Control-Allow-Credentials', 'true');
+    res.header('Access-Control-Allow-Methods', 'GET, POST, PUT, DELETE, OPTIONS');
+    res.header('Access-Control-Allow-Headers', 'Content-Type, Authorization');
+  }
+  next();
+}, userAuthRoutes);
+
 app.use('/api/services', serviceRoutes);
 app.use('/api/contact', contactRoutes);
 app.use('/api/gallery', galleryRoutes);
