@@ -27,9 +27,10 @@ const ContactMessage = require('../models/ContactMessage');
 const GalleryImage = require('../models/GalleryImage');
 const AdminUser = require('../models/AdminUser');
 
-// Seed default services
+// Seed default services and admin user
 const seedDefaultData = async () => {
   try {
+    // Seed services
     const serviceCount = await Service.countDocuments();
     
     if (serviceCount === 0) {
@@ -102,6 +103,28 @@ const seedDefaultData = async () => {
 
       await Service.insertMany(defaultServices);
       console.log('✅ Default services seeded successfully');
+    }
+
+    // Seed admin user
+    const adminCount = await AdminUser.countDocuments();
+    
+    if (adminCount === 0) {
+      const adminUsername = process.env.ADMIN_USERNAME || 'admin';
+      const adminEmail = process.env.ADMIN_EMAIL || 'admin@manforhire.com';
+      const adminPassword = process.env.ADMIN_PASSWORD || 'ManForHire2024!';
+
+      const adminUser = await AdminUser.create({
+        username: adminUsername,
+        email: adminEmail,
+        passwordHash: adminPassword, // The model will hash this automatically
+        role: 'admin'
+      });
+
+      console.log('✅ Default admin user created:');
+      console.log(`   Username: ${adminUsername}`);
+      console.log(`   Email: ${adminEmail}`);
+      console.log(`   Password: ${adminPassword}`);
+      console.log('*** PLEASE CHANGE THE DEFAULT PASSWORD AFTER FIRST LOGIN ***');
     }
   } catch (error) {
     console.error('Error seeding default data:', error);
