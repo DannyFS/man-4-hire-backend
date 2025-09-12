@@ -134,7 +134,7 @@ router.get('/:id', async (req, res) => {
   }
 });
 
-// POST /api/work-orders - Submit new work order
+// POST /api/work-orders - Submit new work order (requires authentication)
 router.post('/', upload.array('images', 5), async (req, res) => {
   try {
     const {
@@ -151,6 +151,23 @@ router.post('/', upload.array('images', 5), async (req, res) => {
       notes
     } = req.body;
 
+    // Require user authentication
+    const token = req.headers.authorization?.replace('Bearer ', '');
+    if (!token) {
+      return res.status(401).json({ error: 'Authentication required. Please sign in to submit a work order.' });
+    }
+
+    let userId;
+    try {
+      const decoded = jwt.verify(token, process.env.JWT_SECRET);
+      if (decoded.role !== 'user') {
+        return res.status(403).json({ error: 'Access denied. User account required.' });
+      }
+      userId = decoded.userId;
+    } catch (error) {
+      return res.status(401).json({ error: 'Invalid or expired token. Please sign in again.' });
+    }
+
     // Validation
     if (!customerName || !customerEmail || !serviceType || !description) {
       return res.status(400).json({
@@ -162,20 +179,6 @@ router.post('/', upload.array('images', 5), async (req, res) => {
     const emailRegex = /^[^\s@]+@[^\s@]+\.[^\s@]+$/;
     if (!emailRegex.test(customerEmail)) {
       return res.status(400).json({ error: 'Invalid email format' });
-    }
-
-    // Check for user authentication (optional)
-    let userId = null;
-    const token = req.headers.authorization?.replace('Bearer ', '');
-    if (token) {
-      try {
-        const decoded = jwt.verify(token, process.env.JWT_SECRET);
-        if (decoded.role === 'user') {
-          userId = decoded.userId;
-        }
-      } catch (error) {
-        // Token invalid or expired, continue as guest
-      }
     }
 
     // Process uploaded images
