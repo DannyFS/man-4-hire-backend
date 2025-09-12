@@ -1,8 +1,29 @@
 // routes/services.js
 const express = require('express');
 const { Service } = require('../config/database');
+const jwt = require('jsonwebtoken');
 
 const router = express.Router();
+
+// Middleware to check admin authentication
+const requireAdmin = async (req, res, next) => {
+  try {
+    const token = req.headers.authorization?.replace('Bearer ', '');
+    if (!token) {
+      return res.status(401).json({ error: 'Authentication required' });
+    }
+
+    const decoded = jwt.verify(token, process.env.JWT_SECRET);
+    if (decoded.role !== 'admin') {
+      return res.status(403).json({ error: 'Admin access required' });
+    }
+
+    req.user = decoded;
+    next();
+  } catch (error) {
+    return res.status(401).json({ error: 'Invalid or expired token' });
+  }
+};
 
 // GET /api/services - Get all services
 router.get('/', async (req, res) => {
@@ -77,7 +98,7 @@ router.get('/:id', async (req, res) => {
 });
 
 // POST /api/services - Create new service (admin only)
-router.post('/', async (req, res) => {
+router.post('/', requireAdmin, async (req, res) => {
   try {
     const {
       name,
@@ -123,7 +144,7 @@ router.post('/', async (req, res) => {
 });
 
 // PUT /api/services/:id - Update service (admin only)
-router.put('/:id', async (req, res) => {
+router.put('/:id', requireAdmin, async (req, res) => {
   try {
     const serviceId = req.params.id;
     const {
@@ -179,7 +200,7 @@ router.put('/:id', async (req, res) => {
 });
 
 // DELETE /api/services/:id - Delete service (admin only)
-router.delete('/:id', async (req, res) => {
+router.delete('/:id', requireAdmin, async (req, res) => {
   try {
     const serviceId = req.params.id;
     
