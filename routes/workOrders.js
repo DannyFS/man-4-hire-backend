@@ -50,6 +50,8 @@ router.get('/', async (req, res) => {
     }
     
     const workOrders = await WorkOrder.find(filter)
+      .populate('contractorId', 'firstName lastName companyName email phone')
+      .populate('userId', 'firstName lastName email')
       .sort({ createdAt: -1 })
       .limit(parseInt(limit))
       .skip(skip)
@@ -222,7 +224,7 @@ router.put('/:id', async (req, res) => {
     }
 
     // Valid status values
-    const validStatuses = ['pending', 'in-progress', 'completed', 'cancelled'];
+    const validStatuses = ['pending', 'claimed', 'in-progress', 'completed', 'cancelled'];
     if (status && !validStatuses.includes(status)) {
       return res.status(400).json({ error: 'Invalid status value' });
     }

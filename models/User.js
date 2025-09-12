@@ -39,8 +39,39 @@ const userSchema = new mongoose.Schema({
   },
   role: {
     type: String,
-    enum: ['user'],
+    enum: ['user', 'contractor'],
     default: 'user'
+  },
+  // Contractor-specific fields
+  companyName: {
+    type: String,
+    trim: true,
+    maxlength: 100
+  },
+  licenseNumber: {
+    type: String,
+    trim: true,
+    maxlength: 50
+  },
+  specialties: [{
+    type: String,
+    trim: true
+  }],
+  yearsExperience: {
+    type: Number,
+    min: 0,
+    max: 50
+  },
+  rating: {
+    type: Number,
+    min: 0,
+    max: 5,
+    default: 0
+  },
+  totalJobs: {
+    type: Number,
+    default: 0,
+    min: 0
   },
   isActive: {
     type: Boolean,

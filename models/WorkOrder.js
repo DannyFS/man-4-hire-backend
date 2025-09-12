@@ -7,6 +7,15 @@ const workOrderSchema = new mongoose.Schema({
     ref: 'User',
     default: null
   },
+  contractorId: {
+    type: mongoose.Schema.Types.ObjectId,
+    ref: 'User',
+    default: null
+  },
+  claimedAt: {
+    type: Date,
+    default: null
+  },
   customerName: {
     type: String,
     required: true,
@@ -54,7 +63,7 @@ const workOrderSchema = new mongoose.Schema({
   },
   status: {
     type: String,
-    enum: ['pending', 'in-progress', 'completed', 'cancelled'],
+    enum: ['pending', 'claimed', 'in-progress', 'completed', 'cancelled'],
     default: 'pending'
   },
   notes: {
@@ -77,5 +86,7 @@ workOrderSchema.index({ customerEmail: 1 });
 workOrderSchema.index({ serviceType: 1 });
 workOrderSchema.index({ createdAt: -1 });
 workOrderSchema.index({ userId: 1, createdAt: -1 });
+workOrderSchema.index({ contractorId: 1, status: 1, createdAt: -1 });
+workOrderSchema.index({ status: 1, contractorId: 1 });
 
 module.exports = mongoose.model('WorkOrder', workOrderSchema);

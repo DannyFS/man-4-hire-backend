@@ -25,6 +25,8 @@ const contactRoutes = require('./routes/contact');
 const galleryRoutes = require('./routes/gallery');
 const authRoutes = require('./routes/auth');
 const userAuthRoutes = require('./routes/userAuth');
+const contractorAuthRoutes = require('./routes/contractorAuth');
+const contractorOrderRoutes = require('./routes/contractorOrders');
 
 // Middleware
 app.use(helmet());
@@ -100,6 +102,23 @@ app.use('/api/user-auth', (req, res, next) => {
   }
   next();
 }, userAuthRoutes);
+
+// Contractor authentication routes with explicit CORS handling
+app.use('/api/contractor-auth', (req, res, next) => {
+  // Set CORS headers for contractor-auth routes specifically
+  const origin = req.headers.origin;
+  if (origin && (origin.endsWith('.vercel.app') || 
+      (process.env.ALLOWED_ORIGINS && process.env.ALLOWED_ORIGINS.split(',').includes(origin)))) {
+    res.header('Access-Control-Allow-Origin', origin);
+    res.header('Access-Control-Allow-Credentials', 'true');
+    res.header('Access-Control-Allow-Methods', 'GET, POST, PUT, DELETE, OPTIONS');
+    res.header('Access-Control-Allow-Headers', 'Content-Type, Authorization');
+  }
+  next();
+}, contractorAuthRoutes);
+
+// Contractor order management routes
+app.use('/api/contractor-orders', contractorOrderRoutes);
 
 app.use('/api/services', serviceRoutes);
 app.use('/api/contact', contactRoutes);
