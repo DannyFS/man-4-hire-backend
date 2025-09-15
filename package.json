@@ -1,7 +1,7 @@
 {
-  "name": "hudson-construction-backend",
+  "name": "man-4-hire-backend",
   "version": "1.0.0",
-  "description": "Backend API for Hudson Construction Consultants website",
+  "description": "Backend API for Man 4 Hire service website",
   "main": "server.js",
   "scripts": {
     "start": "node server.js",
@@ -11,14 +11,14 @@
     "seed": "node scripts/seed.js"
   },
   "keywords": [
-    "construction",
-    "contractor",
-    "licensed",
     "services",
+    "contractors",
+    "handyman",
+    "licensed",
     "api",
     "express"
   ],
-  "author": "Hudson Construction Consultants",
+  "author": "Man 4 Hire",
   "license": "MIT",
   "dependencies": {
     "bcryptjs": "^2.4.3",

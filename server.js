@@ -152,9 +152,9 @@ app.get('/api/health', (req, res) => {
 // API documentation endpoint
 app.get('/api/docs', (req, res) => {
   res.json({
-    name: 'Hudson Construction Consultants API',
+    name: 'Man 4 Hire API',
     version: '1.0.0',
-    description: 'Backend API for Hudson Construction Consultants website',
+    description: 'Backend API for Man 4 Hire service website',
     endpoints: {
       public: [
         'GET /api/health - Health check',
@@ -252,7 +252,7 @@ process.on('SIGTERM', () => {
 
 // Start server
 app.listen(PORT, async () => {
-  console.log(`🚀 Hudson Construction Consultants Full-Stack Application running on port ${PORT}`);
+  console.log(`🚀 Man 4 Hire Full-Stack Application running on port ${PORT}`);
   console.log(`📝 Environment: ${process.env.NODE_ENV || 'development'}`);
   console.log(`🌐 Frontend: http://localhost:${PORT}`);
   console.log(`🔌 API: http://localhost:${PORT}/api`);

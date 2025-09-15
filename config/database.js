@@ -5,7 +5,7 @@ const mongoose = require('mongoose');
 // MongoDB connection
 const connectDB = async () => {
   try {
-    const mongoURI = process.env.MONGODB_URI || 'mongodb://localhost:27017/hudsonconstruction';
+    const mongoURI = process.env.MONGODB_URI || 'mongodb://localhost:27017/man4hire';
     
     await mongoose.connect(mongoURI);
 
@@ -112,7 +112,7 @@ const seedDefaultData = async () => {
     
     if (adminCount === 0) {
       const adminUsername = process.env.ADMIN_USERNAME || 'admin';
-      const adminEmail = process.env.ADMIN_EMAIL || 'admin@hudsonconstruction.com';
+      const adminEmail = process.env.ADMIN_EMAIL || 'admin@man4hire.com';
       const adminPassword = process.env.ADMIN_PASSWORD || 'ManForHire2024!';
 
       const adminUser = await AdminUser.create({
