@@ -38,7 +38,7 @@ const corsOptions = {
     
     const allowedOrigins = process.env.ALLOWED_ORIGINS ? 
       process.env.ALLOWED_ORIGINS.split(',') : 
-      ['http://localhost:3000', 'http://localhost:5173', 'http://localhost:8080'];
+      ['http://localhost:3000', 'http://localhost:5173', 'http://localhost:8080', 'https://www.man4hire.com', 'https://man4hire.com'];
     
     // Allow any Vercel domain and configured origins
     if (allowedOrigins.includes(origin) || origin.endsWith('.vercel.app')) {
