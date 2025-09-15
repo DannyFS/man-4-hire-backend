@@ -5,7 +5,7 @@ const mongoose = require('mongoose');
 // MongoDB connection
 const connectDB = async () => {
   try {
-    const mongoURI = process.env.MONGODB_URI || 'mongodb://localhost:27017/manforhire';
+    const mongoURI = process.env.MONGODB_URI || 'mongodb://localhost:27017/hudsonconstruction';
     
     await mongoose.connect(mongoURI);
 
@@ -23,6 +23,7 @@ const connectDB = async () => {
 // Import models
 const Service = require('../models/Service');
 const WorkOrder = require('../models/WorkOrder');
+const WorkRequest = require('../models/WorkRequest');
 const ContactMessage = require('../models/ContactMessage');
 const GalleryImage = require('../models/GalleryImage');
 const AdminUser = require('../models/AdminUser');
@@ -111,7 +112,7 @@ const seedDefaultData = async () => {
     
     if (adminCount === 0) {
       const adminUsername = process.env.ADMIN_USERNAME || 'admin';
-      const adminEmail = process.env.ADMIN_EMAIL || 'admin@manforhire.com';
+      const adminEmail = process.env.ADMIN_EMAIL || 'admin@hudsonconstruction.com';
       const adminPassword = process.env.ADMIN_PASSWORD || 'ManForHire2024!';
 
       const adminUser = await AdminUser.create({
@@ -259,13 +260,14 @@ const mongoHelpers = {
   }
 };
 
-module.exports = { 
-  connectDB, 
-  ...dbHelpers, 
+module.exports = {
+  connectDB,
+  ...dbHelpers,
   ...mongoHelpers,
   // Export models for direct use
   Service,
   WorkOrder,
+  WorkRequest,
   ContactMessage,
   GalleryImage,
   AdminUser,

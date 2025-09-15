@@ -20,6 +20,7 @@ const { authenticateToken, requireAdmin } = require('./middleware/auth');
 
 // Import routes
 const workOrderRoutes = require('./routes/workOrders');
+const workRequestRoutes = require('./routes/workRequests');
 const serviceRoutes = require('./routes/services');
 const contactRoutes = require('./routes/contact');
 const galleryRoutes = require('./routes/gallery');
@@ -113,6 +114,20 @@ app.use('/api/work-orders', (req, res, next) => {
   authenticateToken(req, res, next);
 }, workOrderRoutes);
 
+// Public work request submission (no auth required for customers)
+app.use('/api/work-requests', (req, res, next) => {
+  // Allow POST requests without authentication (for customers to submit requests)
+  if (req.method === 'POST') {
+    return next();
+  }
+  // Allow GET requests to stats for public access
+  if (req.method === 'GET' && req.path === '/stats/summary') {
+    return next();
+  }
+  // Require authentication for all other work request operations
+  authenticateToken(req, res, next);
+}, workRequestRoutes);
+
 // Admin routes (require authentication and admin role)
 app.get('/api/admin/dashboard', authenticateToken, requireAdmin, async (req, res) => {
   try {
@@ -137,16 +152,18 @@ app.get('/api/health', (req, res) => {
 // API documentation endpoint
 app.get('/api/docs', (req, res) => {
   res.json({
-    name: 'Man for Hire API',
+    name: 'Hudson Construction Consultants API',
     version: '1.0.0',
-    description: 'Backend API for contractor services website',
+    description: 'Backend API for Hudson Construction Consultants website',
     endpoints: {
       public: [
         'GET /api/health - Health check',
         'GET /api/services - Get all services',
         'GET /api/services/categories - Get service categories',
         'GET /api/services/:id - Get specific service',
-        'POST /api/work-orders - Submit work order',
+        'POST /api/work-orders - Submit work order (legacy)',
+        'POST /api/work-requests - Submit work request',
+        'GET /api/work-requests/stats/summary - Get work request statistics',
         'POST /api/contact - Submit contact message',
         'GET /api/gallery - Get gallery images',
         'POST /api/auth/login - Admin login',
@@ -154,9 +171,13 @@ app.get('/api/docs', (req, res) => {
       ],
       admin: [
         'GET /api/admin/dashboard - Admin dashboard stats',
-        'GET /api/work-orders - Get all work orders',
-        'PUT /api/work-orders/:id - Update work order',
-        'DELETE /api/work-orders/:id - Delete work order',
+        'GET /api/work-orders - Get all work orders (legacy)',
+        'PUT /api/work-orders/:id - Update work order (legacy)',
+        'DELETE /api/work-orders/:id - Delete work order (legacy)',
+        'GET /api/work-requests - Get all work requests',
+        'GET /api/work-requests/:id - Get specific work request',
+        'PUT /api/work-requests/:id - Update work request',
+        'DELETE /api/work-requests/:id - Delete work request',
         'POST/PUT/DELETE /api/services/* - Manage services',
         'GET /api/contact - Get contact messages',
         'PUT /api/contact/:id - Update message status',
@@ -231,16 +252,16 @@ process.on('SIGTERM', () => {
 
 // Start server
 app.listen(PORT, async () => {
-  console.log(`🚀 Man for Hire Full-Stack Application running on port ${PORT}`);
+  console.log(`🚀 Hudson Construction Consultants Full-Stack Application running on port ${PORT}`);
   console.log(`📝 Environment: ${process.env.NODE_ENV || 'development'}`);
   console.log(`🌐 Frontend: http://localhost:${PORT}`);
   console.log(`🔌 API: http://localhost:${PORT}/api`);
   console.log(`📚 API Documentation: http://localhost:${PORT}/api/docs`);
   console.log(`❤️  Health Check: http://localhost:${PORT}/api/health`);
-  
+
   // Connect to MongoDB
   await connectDB();
-  
+
   // Setup directories on startup
   const { setupDirectories } = require('./scripts/setup');
   setupDirectories();
