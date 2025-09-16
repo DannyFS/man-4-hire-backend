@@ -7,12 +7,28 @@ const workRequestSchema = new mongoose.Schema({
     required: true,
     trim: true
   },
+  customerEmail: {
+    type: String,
+    required: true,
+    trim: true,
+    lowercase: true
+  },
+  customerPhone: {
+    type: String,
+    required: true,
+    trim: true
+  },
   customerAddress: {
     type: String,
     required: true,
     trim: true
   },
   projectType: {
+    type: String,
+    required: true,
+    trim: true
+  },
+  projectDescription: {
     type: String,
     required: true,
     trim: true
@@ -53,5 +69,6 @@ workRequestSchema.index({ status: 1, createdAt: -1 });
 workRequestSchema.index({ urgencyLevel: 1 });
 workRequestSchema.index({ servicePreference: 1 });
 workRequestSchema.index({ createdAt: -1 });
+workRequestSchema.index({ customerEmail: 1 });
 
 module.exports = mongoose.model('WorkRequest', workRequestSchema);
