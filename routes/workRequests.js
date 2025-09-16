@@ -69,17 +69,27 @@ router.post('/', async (req, res) => {
   try {
     const {
       customerName,
+      customerEmail,
+      customerPhone,
       customerAddress,
       projectType,
+      projectDescription,
       urgencyLevel,
       servicePreference
     } = req.body;
 
     // Validation
-    if (!customerName || !customerAddress || !projectType || !urgencyLevel || !servicePreference) {
+    if (!customerName || !customerEmail || !customerPhone || !customerAddress || 
+        !projectType || !projectDescription || !urgencyLevel || !servicePreference) {
       return res.status(400).json({
-        error: 'Missing required fields: customerName, customerAddress, projectType, urgencyLevel, servicePreference'
+        error: 'Missing required fields: customerName, customerEmail, customerPhone, customerAddress, projectType, projectDescription, urgencyLevel, servicePreference'
       });
+    }
+
+    // Validate email format
+    const emailRegex = /^[^\s@]+@[^\s@]+\.[^\s@]+$/;
+    if (!emailRegex.test(customerEmail)) {
+      return res.status(400).json({ error: 'Invalid email format' });
     }
 
     // Validate enum values
@@ -96,8 +106,11 @@ router.post('/', async (req, res) => {
 
     const newWorkRequest = await WorkRequest.create({
       customerName,
+      customerEmail,
+      customerPhone,
       customerAddress,
       projectType,
+      projectDescription,
       urgencyLevel,
       servicePreference,
       status: 'pending'
